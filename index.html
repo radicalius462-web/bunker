@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bunker Calculator — расчёт топлива на рейс</title>
+<style>
+  :root{
+    --ink:#0e2233;
+    --ink-soft:#41586a;
+    --paper:#f3f1ea;
+    --panel:#ffffff;
+    --line:#d8d3c4;
+    --steel:#2f5c78;
+    --steel-deep:#1c3f56;
+    --amber:#b8722c;
+    --amber-soft:#f3e2cc;
+    --good:#3c6e4f;
+    --bad:#9a4a38;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:var(--sans);background:var(--paper);color:var(--ink);padding:32px 24px 80px;}
+  .wrap{max-width:1120px;margin:0 auto;}
+  header{border-bottom:2px solid var(--ink);padding-bottom:16px;margin-bottom:28px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;}
+  header h1{font-size:22px;margin:0 0 4px;font-weight:700;letter-spacing:.2px;}
+  header p{margin:0;color:var(--ink-soft);font-size:13px;}
+  .voyage-meta{font-family:var(--mono);font-size:12px;color:var(--ink-soft);text-align:right;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:18px 20px;margin-bottom:20px;}
+  .panel-title{font-size:13px;font-weight:700;color:var(--steel-deep);margin:0 0 12px;display:flex;align-items:center;justify-content:space-between;}
+  .panel-sub{font-size:11.5px;color:var(--ink-soft);margin:-6px 0 14px;}
+
+  select, input[type=text], input[type=number]{
+    font-family:var(--sans);font-size:13px;padding:6px 8px;border:1px solid var(--line);
+    border-radius:2px;background:#fff;color:var(--ink);
+  }
+  input[type=number]{font-family:var(--mono);text-align:right;}
+
+  .profile-group{border:1px solid var(--line);border-radius:2px;padding:12px 14px;margin-bottom:12px;background:#fafaf6;}
+  .profile-group-title{font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:10px;}
+  .profile-group.laden{border-left:3px solid var(--steel);}
+  .profile-group.laden .profile-group-title{color:var(--steel-deep);}
+  .profile-group.ballast{border-left:3px solid var(--amber);}
+  .profile-group.ballast .profile-group-title{color:var(--amber);}
+  .profile-group.port{border-left:3px solid var(--good);}
+  .profile-group.port .profile-group-title{color:var(--good);}
+  .profile-group.addcons{border-left:3px solid var(--ink-soft);}
+  .profile-group.addcons .profile-group-title{color:var(--ink-soft);}
+  .profile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 16px;}
+  .field{display:flex;flex-direction:column;gap:4px;}
+  .field label{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--ink-soft);}
+  .field input, .field select{width:100%;}
+  .save-note{font-size:11px;color:var(--ink-soft);margin-top:6px;}
+
+  .margin-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+  .margin-row .field{width:140px;}
+
+  table.route-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:10px;}
+  table.route-table th{text-align:left;font-weight:600;color:var(--ink-soft);font-size:11px;text-transform:uppercase;letter-spacing:.03em;padding:4px 6px;border-bottom:1px solid var(--line);}
+  table.route-table td{padding:5px 6px;vertical-align:middle;}
+  table.route-table td.num{font-family:var(--mono);text-align:right;}
+  .route-add-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:6px;border-top:1px dashed var(--line);}
+  .route-add-row input[type=text]{width:150px;}
+  .route-add-row input[type=number]{width:90px;}
+  .btn-primary-mini{background:var(--steel-deep);color:#fff;border:none;font-size:12px;padding:6px 12px;border-radius:2px;cursor:pointer;}
+  .btn-primary-mini:hover{background:var(--steel);}
+  .icon-x{background:none;border:none;color:var(--bad);cursor:pointer;font-size:14px;padding:2px 6px;line-height:1;}
+
+  .leg{border:1px solid var(--line);background:var(--panel);margin-bottom:16px;border-radius:2px;}
+  .leg-head{display:flex;align-items:center;gap:12px;padding:12px 16px;background:#eceadf;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  .leg-head .leg-index{font-family:var(--mono);font-size:12px;color:var(--ink-soft);width:22px;}
+  .leg-head input[type=text]{width:170px;}
+  .leg-head select{width:110px;}
+  .btn-remove{background:none;border:1px solid var(--line);color:var(--bad);font-size:12px;padding:5px 10px;border-radius:2px;cursor:pointer;margin-left:auto;}
+  .btn-remove:hover{background:#f6e6e1;}
+  .btn-mini{background:#fff;border:1px solid var(--steel);color:var(--steel-deep);font-size:11.5px;padding:5px 9px;border-radius:2px;cursor:pointer;white-space:nowrap;}
+  .btn-mini:hover{background:#eaf1f5;}
+  .lookup-msg{font-size:11.5px;font-style:italic;color:var(--ink-soft);}
+  .lookup-msg.ok{color:var(--good);}
+  .lookup-msg.miss{color:var(--amber);}
+
+  .leg-body{padding:14px 16px 18px;}
+  .section-label{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:14px 0 8px;font-weight:700;}
+  .section-label:first-child{margin-top:0;}
+  .row-fields{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;}
+  .row-fields .field{width:150px;}
+  .row-fields .field.narrow{width:110px;}
+  .readout{font-family:var(--mono);font-size:12px;color:var(--steel-deep);align-self:center;}
+  .warn{font-size:11.5px;color:var(--bad);margin-top:-4px;margin-bottom:8px;}
+  .checkline{font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;align-self:center;}
+
+  .breakdown-box{background:#fafaf6;border:1px solid var(--line);padding:10px 12px;font-family:var(--mono);font-size:12px;color:var(--ink-soft);line-height:1.8;}
+  .breakdown-box b{color:var(--ink);}
+  .breakdown-box .vlsfo-tag{border-left:3px solid var(--steel);padding-left:6px;}
+  .breakdown-box .lsmgo-tag{border-left:3px solid var(--amber);padding-left:6px;}
+  .breakdown-box .margin-tag{border-left:3px solid var(--ink-soft);padding-left:6px;}
+
+  #add-leg-btn{display:block;width:100%;padding:12px;background:var(--steel-deep);color:#fff;border:none;font-size:13px;font-weight:600;border-radius:2px;cursor:pointer;margin-bottom:28px;}
+  #add-leg-btn:hover{background:var(--steel);}
+
+  table.summary-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.summary-table th{text-align:right;font-size:11px;text-transform:uppercase;color:var(--ink-soft);padding:6px 10px;border-bottom:2px solid var(--ink);}
+  table.summary-table th:first-child, table.summary-table td:first-child{text-align:left;}
+  table.summary-table td{padding:7px 10px;font-family:var(--mono);text-align:right;border-bottom:1px solid var(--line);}
+  table.summary-table tr.grand td{font-weight:700;background:#eceadf;border-top:2px solid var(--ink);}
+
+  table.breakdown-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;}
+  table.breakdown-table th{text-align:right;font-size:10.5px;text-transform:uppercase;color:var(--ink-soft);padding:5px 8px;border-bottom:1px solid var(--line);}
+  table.breakdown-table th:first-child, table.breakdown-table td:first-child{text-align:left;}
+  table.breakdown-table td{padding:5px 8px;font-family:var(--mono);text-align:right;border-bottom:1px solid #ece9dd;}
+
+  .note{font-size:11.5px;color:var(--ink-soft);margin-top:10px;line-height:1.5;}
+  .empty-state{text-align:center;color:var(--ink-soft);font-size:13px;padding:30px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Bunker Calculator</h1>
+      <p>Профиль расхода судна → рейс по легам (laden/ballast, ECA, порт, канал, sea margin) → сколько топлива нужно</p>
+    </div>
+    <div class="voyage-meta" id="voyage-meta"></div>
+  </header>
+
+  <div class="panel">
+    <div class="panel-title">Профиль расхода судна</div>
+    <div class="panel-sub">Вводится один раз, сохраняется в браузере и подставляется автоматически в каждый рейс.</div>
+
+    <div class="profile-group laden">
+      <div class="profile-group-title">Laden</div>
+      <div class="profile-grid">
+        <div class="field"><label>Скорость, уз</label><input type="number" id="p-speedLaden" min="0" step="0.1"></div>
+        <div class="field"><label>VLSFO, т/сут (не-ECA)</label><input type="number" id="p-vlsfoLaden" min="0" step="0.01"></div>
+        <div class="field"><label>LSMGO, т/сут (в ECA)</label><input type="number" id="p-lsmgoLaden" min="0" step="0.01"></div>
+      </div>
+    </div>
+
+    <div class="profile-group ballast">
+      <div class="profile-group-title">Ballast</div>
+      <div class="profile-grid">
+        <div class="field"><label>Скорость, уз</label><input type="number" id="p-speedBallast" min="0" step="0.1"></div>
+        <div class="field"><label>VLSFO, т/сут (не-ECA)</label><input type="number" id="p-vlsfoBallast" min="0" step="0.01"></div>
+        <div class="field"><label>LSMGO, т/сут (в ECA)</label><input type="number" id="p-lsmgoBallast" min="0" step="0.01"></div>
+      </div>
+    </div>
+
+    <div class="profile-group port">
+      <div class="profile-group-title">Порт</div>
+      <div class="profile-grid">
+        <div class="field"><label>Port stay (якорь/дрейф), т/сут</label><input type="number" id="p-portStay" min="0" step="0.01"></div>
+        <div class="field"><label>Port work (груз. операции), т/сут</label><input type="number" id="p-portWork" min="0" step="0.01"></div>
+      </div>
+      <div class="note" style="margin-top:8px;">Ставки едины, а какое топливо ими расходуется (VLSFO или LSMGO) — выбирается на каждом этапе отдельно, порты бывают разные.</div>
+    </div>
+
+    <div class="profile-group addcons">
+      <div class="profile-group-title">Доп. параметр</div>
+      <div class="profile-grid">
+        <div class="field"><label>Add cons LSMGO, т/сут</label><input type="number" id="p-addConsLsmgo" min="0" step="0.01"></div>
+      </div>
+      <div class="note" style="margin-top:8px;">Ставка на случай доп. расхода — не всегда нужна. Включается отдельным чекбоксом на каждом этапе; если не включена — не учитывается вообще.</div>
+    </div>
+
+    <div class="save-note" id="profile-save-note">сохраняется автоматически</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Sea Margin</div>
+    <div class="panel-sub">Margin прибавляется к суткам морского перехода (и не-ECA, и ECA части пропорционально), а не к тоннам напрямую. На порт и на канал не влияет.</div>
+    <div class="margin-row">
+      <div class="field"><label>Sea Margin, %</label><input type="number" id="sea-margin" value="10" min="0" step="0.5"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Библиотека маршрутов (дистанции)</div>
+    <div id="routes-container"></div>
+    <p class="note" style="margin-top:6px;">Дистанции не рассчитываются — вводите один раз пару портов и nm (из Dataloy/AXS Marine), калькулятор сохраняет и в следующий раз подставляет сам. А→Б и Б→А считаются одним маршрутом.</p>
+  </div>
+
+  <div id="legs-container"></div>
+  <button id="add-leg-btn">+ Добавить этап рейса (leg)</button>
+
+  <div class="panel">
+    <div class="panel-title">Итог по рейсу</div>
+    <div id="summary-container"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Разбивка по этапам (leg by leg)</div>
+    <div id="breakdown-container"></div>
+  </div>
+
+  <p class="note">Формула по этапу: <b>Sea cons</b> (не-ECA на VLSFO + ECA на LSMGO, обе части уже со Sea Margin) + <b>Port cons</b> (стоянка/работа, топливо выбирается) + <b>Канал</b> (опционально, топливо выбирается, без margin) + <b>Add cons LSMGO</b> (опционально, на все сутки перехода) = итог по каждому топливу. Всё, что не введено явно, считается нулём.</p>
+</div>
+
+<script>
+// ВАЖНО: window.storage существует только внутри артефактов Claude.
+// Вот полифилл поверх localStorage браузера — та же логика, что и в
+// laytime-калькуляторе: данные сохраняются локально, в этом браузере.
+(function(){
+  const INDEX_KEY = 'bunker_storage_index_v1';
+  function readAll(){
+    try{ const raw = localStorage.getItem(INDEX_KEY); return raw ? JSON.parse(raw) : {}; }
+    catch(e){ return {}; }
+  }
+  function writeAll(obj){ localStorage.setItem(INDEX_KEY, JSON.stringify(obj)); }
+  window.storage = {
+    async set(key, value){ const all = readAll(); all[key] = value; writeAll(all); return { key, value, shared:false }; },
+    async get(key){ const all = readAll(); if(!(key in all)) return null; return { key, value: all[key], shared:false }; },
+    async delete(key){ const all = readAll(); const existed = key in all; delete all[key]; writeAll(all); return { key, deleted: existed, shared:false }; },
+    async list(prefix){ const all = readAll(); const keys = Object.keys(all).filter(k => k.startsWith(prefix||'')); return { keys, prefix, shared:false }; }
+  };
+})();
+
+let idc = 1;
+const nextId = () => 'id' + (idc++);
+function fmt(n, d=3){
+  if(!isFinite(n)) return '0.' + '0'.repeat(d);
+  return n.toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function debounce(fn, ms){
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+const state = {
+  profile: {
+    speedLaden:0, speedBallast:0,
+    vlsfoLaden:0, lsmgoLaden:0, addConsLsmgo:0,
+    vlsfoBallast:0, lsmgoBallast:0,
+    portStay:0, portWork:0
+  },
+  seaMarginPercent: 10,
+  routes: [],
+  legs: []
+};
+
+function newLeg(){
+  return {
+    id: nextId(),
+    fromPort: '', toPort: '',
+    condition: 'laden',
+    distanceNm: 0,
+    ecaNm: 0,
+    addCons: false,
+    portStayDays: 0, portStayFuel: 'lsmgo',
+    portWorkDays: 0, portWorkFuel: 'lsmgo',
+    canalEnabled: false, canalDays: 0, canalFuel: 'lsmgo'
+  };
+}
+
+// ---------- persistence ----------
+async function loadProfile(){
+  try{
+    const res = await window.storage.get('vesselProfile', false);
+    return res && res.value ? JSON.parse(res.value) : null;
+  }catch(err){ return null; }
+}
+const saveProfile = debounce(async () => {
+  try{
+    await window.storage.set('vesselProfile', JSON.stringify(state.profile), false);
+    document.getElementById('profile-save-note').textContent = 'сохранено';
+    setTimeout(() => { document.getElementById('profile-save-note').textContent = 'сохраняется автоматически'; }, 1200);
+  }catch(err){ console.error('save profile failed', err); }
+}, 500);
+
+async function loadRoutesFromStorage(){
+  try{
+    const res = await window.storage.get('routes', false);
+    return res && res.value ? JSON.parse(res.value) : [];
+  }catch(err){ return []; }
+}
+async function saveRoutesToStorage(){
+  try{ await window.storage.set('routes', JSON.stringify(state.routes), false); }
+  catch(err){ console.error('save routes failed', err); }
+}
+
+// ---------- profile panel wiring ----------
+const profileFieldIds = {
+  speedLaden:'p-speedLaden', speedBallast:'p-speedBallast',
+  vlsfoLaden:'p-vlsfoLaden', lsmgoLaden:'p-lsmgoLaden', addConsLsmgo:'p-addConsLsmgo',
+  vlsfoBallast:'p-vlsfoBallast', lsmgoBallast:'p-lsmgoBallast',
+  portStay:'p-portStay', portWork:'p-portWork'
+};
+function renderProfileInputs(){
+  Object.entries(profileFieldIds).forEach(([key, id]) => {
+    document.getElementById(id).value = state.profile[key];
+  });
+}
+Object.entries(profileFieldIds).forEach(([key, id]) => {
+  document.getElementById(id).addEventListener('input', e => {
+    state.profile[key] = Number(e.target.value) || 0;
+    saveProfile();
+    renderLegs();
+  });
+});
+
+document.getElementById('sea-margin').addEventListener('input', e => {
+  state.seaMarginPercent = Number(e.target.value) || 0;
+  renderLegs();
+});
+
+// ---------- route library ----------
+function normPort(s){ return String(s||'').trim().toLowerCase(); }
+function findRoute(from, to){
+  const f = normPort(from), t = normPort(to);
+  if(!f || !t) return null;
+  return state.routes.find(r =>
+    (normPort(r.from) === f && normPort(r.to) === t) ||
+    (normPort(r.from) === t && normPort(r.to) === f)
+  ) || null;
+}
+function upsertRoute(from, to, distanceNm){
+  const existing = findRoute(from, to);
+  if(existing){ existing.distanceNm = distanceNm; }
+  else { state.routes.push({ id: nextId(), from: from.trim(), to: to.trim(), distanceNm }); }
+  saveRoutesToStorage();
+  renderRoutesPanel();
+  renderLegs();
+}
+function deleteRoute(id){
+  state.routes = state.routes.filter(r => r.id !== id);
+  saveRoutesToStorage();
+  renderRoutesPanel();
+  renderLegs();
+}
+function portDatalist(){
+  const names = new Set();
+  state.routes.forEach(r => { if(r.from) names.add(r.from); if(r.to) names.add(r.to); });
+  return '<datalist id="port-list">' + [...names].map(p => `<option value="${escapeHtml(p)}">`).join('') + '</datalist>';
+}
+function renderRoutesPanel(){
+  const c = document.getElementById('routes-container');
+  const rows = state.routes.map(r => `
+    <tr>
+      <td>${escapeHtml(r.from)}</td>
+      <td>${escapeHtml(r.to)}</td>
+      <td class="num">${fmt(r.distanceNm,1)}</td>
+      <td><button class="icon-x" data-route-action="delete" data-route-id="${r.id}" title="удалить маршрут">✕</button></td>
+    </tr>`).join('');
+  c.innerHTML = `
+    ${state.routes.length ? `
+    <table class="route-table">
+      <thead><tr><th>От</th><th>До</th><th style="text-align:right;">Дистанция, nm</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>` : '<div class="empty-state" style="padding:10px 0;">Маршрутов пока нет — добавьте вручную ниже или сохраните прямо из этапа рейса.</div>'}
+    <div class="route-add-row">
+      <input type="text" id="new-route-from" placeholder="От (порт)">
+      <input type="text" id="new-route-to" placeholder="До (порт)">
+      <input type="number" id="new-route-distance" placeholder="nm" min="0" step="1">
+      <button class="btn-primary-mini" id="add-route-btn">+ добавить маршрут</button>
+    </div>`;
+}
+document.getElementById('routes-container').addEventListener('click', e => {
+  const btn = e.target.closest('[data-route-action]');
+  if(btn && btn.dataset.routeAction === 'delete'){ deleteRoute(btn.dataset.routeId); return; }
+  if(e.target.id === 'add-route-btn'){
+    const from = document.getElementById('new-route-from').value.trim();
+    const to = document.getElementById('new-route-to').value.trim();
+    const dist = Number(document.getElementById('new-route-distance').value) || 0;
+    if(!from || !to || dist <= 0){ alert('Укажите порт "От", порт "До" и дистанцию больше 0.'); return; }
+    upsertRoute(from, to, dist);
+  }
+});
+
+// ---------- leg calculations ----------
+function legSpeed(leg){ return leg.condition === 'laden' ? state.profile.speedLaden : state.profile.speedBallast; }
+function legVlsfoRate(leg){ return leg.condition === 'laden' ? state.profile.vlsfoLaden : state.profile.vlsfoBallast; }
+function legLsmgoRate(leg){ return leg.condition === 'laden' ? state.profile.lsmgoLaden : state.profile.lsmgoBallast; }
+function marginFactor(){ return 1 + (Number(state.seaMarginPercent) || 0) / 100; }
+
+function baseSeaDays(leg){
+  const spd = legSpeed(leg);
+  if(spd <= 0) return 0;
+  return (Number(leg.distanceNm) || 0) / spd / 24;
+}
+function baseEcaDays(leg){
+  const spd = legSpeed(leg);
+  if(spd <= 0) return 0;
+  const ecaNm = Math.min(Number(leg.ecaNm) || 0, Number(leg.distanceNm) || 0);
+  return ecaNm / spd / 24;
+}
+
+function computeLeg(leg){
+  const factor = marginFactor();
+  const seaDaysBase = baseSeaDays(leg);
+  const ecaDaysBase = baseEcaDays(leg);
+  const seaDays = seaDaysBase * factor;          // total transit days incl. margin
+  const ecaDays = ecaDaysBase * factor;           // ECA portion incl. margin
+  const nonEcaDays = Math.max(seaDays - ecaDays, 0);
+  const marginDays = seaDays - seaDaysBase;
+
+  const vlsfoRate = legVlsfoRate(leg);
+  const lsmgoRate = legLsmgoRate(leg);
+
+  // sea consumption: non-ECA burns VLSFO, ECA burns LSMGO — no double counting
+  const vlsfoSea = nonEcaDays * vlsfoRate;
+  const lsmgoSea = ecaDays * lsmgoRate;
+
+  // add cons — optional, over the whole transit (incl. margin), LSMGO only
+  const lsmgoAddCons = leg.addCons ? seaDays * state.profile.addConsLsmgo : 0;
+
+  // port — fuel choice per line, no margin
+  const portStayDays = Number(leg.portStayDays) || 0;
+  const portWorkDays = Number(leg.portWorkDays) || 0;
+  const portStayT = portStayDays * state.profile.portStay;
+  const portWorkT = portWorkDays * state.profile.portWork;
+  let vlsfoPort = 0, lsmgoPort = 0;
+  if(leg.portStayFuel === 'vlsfo') vlsfoPort += portStayT; else lsmgoPort += portStayT;
+  if(leg.portWorkFuel === 'vlsfo') vlsfoPort += portWorkT; else lsmgoPort += portWorkT;
+
+  // canal — optional, fuel choice, at underway rate of chosen fuel for this condition, no margin
+  const canalDays = leg.canalEnabled ? (Number(leg.canalDays) || 0) : 0;
+  let vlsfoCanal = 0, lsmgoCanal = 0;
+  if(canalDays > 0){
+    if(leg.canalFuel === 'vlsfo') vlsfoCanal = canalDays * vlsfoRate;
+    else lsmgoCanal = canalDays * lsmgoRate;
+  }
+
+  return {
+    seaDaysBase, seaDays, ecaDaysBase, ecaDays, nonEcaDays, marginDays,
+    portStayDays, portWorkDays, canalDays,
+    vlsfoSea, lsmgoSea, lsmgoAddCons,
+    vlsfoPort, lsmgoPort, vlsfoCanal, lsmgoCanal,
+    vlsfoTotal: vlsfoSea + vlsfoPort + vlsfoCanal,
+    lsmgoTotal: lsmgoSea + lsmgoAddCons + lsmgoPort + lsmgoCanal
+  };
+}
+
+// ---------- render legs ----------
+function renderLegs(){
+  const c = document.getElementById('legs-container');
+  if(state.legs.length === 0){
+    c.innerHTML = '<div class="empty-state">Этапов пока нет. Нажмите «Добавить этап рейса».</div>';
+    recomputeAll();
+    return;
+  }
+  c.innerHTML = portDatalist() + state.legs.map((leg, li) => legHtml(leg, li)).join('');
+  recomputeAll();
+}
+
+function fuelSelect(field, legId, value){
+  return `<select data-field="${field}" data-leg="${legId}">
+    <option value="lsmgo" ${value==='lsmgo'?'selected':''}>LSMGO</option>
+    <option value="vlsfo" ${value==='vlsfo'?'selected':''}>VLSFO</option>
+  </select>`;
+}
+
+function legHtml(leg, li){
+  const calc = computeLeg(leg);
+  const overEca = (Number(leg.ecaNm)||0) > (Number(leg.distanceNm)||0);
+  return `
+  <div class="leg" data-leg="${leg.id}">
+    <div class="leg-head">
+      <span class="leg-index">${li+1}.</span>
+      <input type="text" list="port-list" data-field="fromPort" data-leg="${leg.id}" value="${escapeHtml(leg.fromPort)}" placeholder="От (порт)">
+      <span style="color:var(--ink-soft);">→</span>
+      <input type="text" list="port-list" data-field="toPort" data-leg="${leg.id}" value="${escapeHtml(leg.toPort)}" placeholder="До (порт)">
+      <select data-field="condition" data-leg="${leg.id}">
+        <option value="laden" ${leg.condition==='laden'?'selected':''}>Laden</option>
+        <option value="ballast" ${leg.condition==='ballast'?'selected':''}>Ballast</option>
+      </select>
+      <button class="btn-mini" data-action="lookup-distance" data-leg="${leg.id}">↺ дистанция из библиотеки</button>
+      <button class="btn-mini" data-action="save-route" data-leg="${leg.id}">💾 сохранить маршрут</button>
+      <button class="btn-remove" data-action="remove-leg" data-leg="${leg.id}">Удалить этап</button>
+    </div>
+    <div class="leg-body">
+      <span class="lookup-msg" id="lookup-msg-${leg.id}"></span>
+
+      <div class="section-label">Морской переход</div>
+      <div class="row-fields">
+        <div class="field"><label>Дистанция, nm</label><input type="number" data-field="distanceNm" data-leg="${leg.id}" value="${leg.distanceNm}" min="0" step="0.1"></div>
+        <div class="field"><label>Скорость (${leg.condition}), уз</label><input type="number" value="${fmt(legSpeed(leg),1)}" disabled style="background:#eee;"></div>
+        <span class="readout">${fmt(calc.seaDaysBase,3)} сут база + ${fmt(calc.marginDays,3)} сут margin = <b>${fmt(calc.seaDays,3)} сут в пути</b></span>
+      </div>
+
+      <div class="row-fields">
+        <div class="field"><label>Миль в ECA-зоне</label><input type="number" data-field="ecaNm" data-leg="${leg.id}" value="${leg.ecaNm}" min="0" step="0.1"></div>
+        <span class="readout">= ${fmt(calc.ecaDays,3)} сут в ECA на LSMGO (с margin), ${fmt(calc.nonEcaDays,3)} сут вне ECA на VLSFO</span>
+        <label class="checkline">
+          <input type="checkbox" data-field="addCons" data-leg="${leg.id}" ${leg.addCons?'checked':''}> Доп. расход LSMGO (add cons) на весь переход
+        </label>
+      </div>
+      ${overEca ? '<div class="warn">Миль в ECA больше, чем вся дистанция этапа — проверьте ввод.</div>' : ''}
+
+      <div class="section-label">Порт ${escapeHtml(leg.toPort || '(назначения)')}</div>
+      <div class="row-fields">
+        <div class="field"><label>Дней на якоре/дрейф</label><input type="number" data-field="portStayDays" data-leg="${leg.id}" value="${leg.portStayDays}" min="0" step="0.01"></div>
+        <div class="field narrow"><label>Топливо</label>${fuelSelect('portStayFuel', leg.id, leg.portStayFuel)}</div>
+        <div class="field"><label>Дней грузовых опер.</label><input type="number" data-field="portWorkDays" data-leg="${leg.id}" value="${leg.portWorkDays}" min="0" step="0.01"></div>
+        <div class="field narrow"><label>Топливо</label>${fuelSelect('portWorkFuel', leg.id, leg.portWorkFuel)}</div>
+      </div>
+
+      <div class="section-label">Канал (опционально)</div>
+      <div class="row-fields">
+        <label class="checkline">
+          <input type="checkbox" data-field="canalEnabled" data-leg="${leg.id}" ${leg.canalEnabled?'checked':''}> учитывать доп. дни прохода канала
+        </label>
+        ${leg.canalEnabled ? `
+        <div class="field"><label>Доп. дней (канал)</label><input type="number" data-field="canalDays" data-leg="${leg.id}" value="${leg.canalDays}" min="0" step="0.01"></div>
+        <div class="field narrow"><label>Топливо</label>${fuelSelect('canalFuel', leg.id, leg.canalFuel)}</div>
+        <span class="readout">по ставке перехода (${leg.condition}), margin не применяется</span>
+        ` : ''}
+      </div>
+
+      <div class="section-label">Расход по этапу</div>
+      <div class="breakdown-box" id="leg-breakdown-${leg.id}"></div>
+    </div>
+  </div>`;
+}
+
+function renderLegBreakdown(leg){
+  const c = computeLeg(leg);
+  const el = document.getElementById(`leg-breakdown-${leg.id}`);
+  if(!el) return;
+  el.innerHTML = `
+    <div class="margin-tag">Sea margin: ${fmt(state.seaMarginPercent,1)}% → ${fmt(c.seaDaysBase,2)} сут база + ${fmt(c.marginDays,2)} сут = ${fmt(c.seaDays,2)} сут в пути</div>
+    <div class="vlsfo-tag">VLSFO: sea (не-ECA) ${fmt(c.nonEcaDays,2)} сут × ставка = ${fmt(c.vlsfoSea)} т; порт ${fmt(c.vlsfoPort)} т; канал ${fmt(c.vlsfoCanal)} т</div>
+    <div class="lsmgo-tag">LSMGO: sea (ECA) ${fmt(c.ecaDays,2)} сут × ставка = ${fmt(c.lsmgoSea)} т; add cons ${leg.addCons?'вкл':'выкл'} = ${fmt(c.lsmgoAddCons)} т; порт ${fmt(c.lsmgoPort)} т; канал ${fmt(c.lsmgoCanal)} т</div>
+    <div style="margin-top:4px;">Итого по этапу — <b>VLSFO: ${fmt(c.vlsfoTotal)} т</b>, <b>LSMGO: ${fmt(c.lsmgoTotal)} т</b></div>
+  `;
+}
+
+function findLeg(id){ return state.legs.find(l => l.id === id); }
+
+// ---------- event delegation: legs ----------
+document.getElementById('legs-container').addEventListener('input', e => {
+  const t = e.target;
+  const legId = t.dataset.leg;
+  if(!legId) return;
+  const leg = findLeg(legId);
+  if(!leg) return;
+  const field = t.dataset.field;
+  if(field === 'fromPort') leg.fromPort = t.value;
+  else if(field === 'toPort') leg.toPort = t.value;
+  else if(field === 'distanceNm') leg.distanceNm = Number(t.value) || 0;
+  else if(field === 'ecaNm') leg.ecaNm = Number(t.value) || 0;
+  else if(field === 'portStayDays') leg.portStayDays = Number(t.value) || 0;
+  else if(field === 'portWorkDays') leg.portWorkDays = Number(t.value) || 0;
+  else if(field === 'canalDays') leg.canalDays = Number(t.value) || 0;
+  else if(field === 'condition'){ leg.condition = t.value; renderLegs(); return; }
+  else if(field === 'addCons'){ leg.addCons = t.checked; renderLegBreakdown(leg); recomputeAll(); return; }
+  else if(field === 'canalEnabled'){ leg.canalEnabled = t.checked; renderLegs(); return; }
+  else if(field === 'portStayFuel'){ leg.portStayFuel = t.value; renderLegBreakdown(leg); recomputeAll(); return; }
+  else if(field === 'portWorkFuel'){ leg.portWorkFuel = t.value; renderLegBreakdown(leg); recomputeAll(); return; }
+  else if(field === 'canalFuel'){ leg.canalFuel = t.value; renderLegBreakdown(leg); recomputeAll(); return; }
+  else return;
+
+  renderLegBreakdown(leg);
+  recomputeAll();
+});
+
+document.getElementById('legs-container').addEventListener('click', e => {
+  const btn = e.target.closest('[data-action]');
+  if(!btn) return;
+  const action = btn.dataset.action;
+  const legId = btn.dataset.leg;
+  const leg = findLeg(legId);
+
+  if(action === 'remove-leg'){
+    state.legs = state.legs.filter(l => l.id !== legId);
+    renderLegs();
+    return;
+  }
+  if(!leg) return;
+
+  if(action === 'lookup-distance'){
+    const route = findRoute(leg.fromPort, leg.toPort);
+    const msgEl = document.getElementById(`lookup-msg-${leg.id}`);
+    if(route){
+      leg.distanceNm = route.distanceNm;
+      const distEl = document.querySelector(`input[data-field="distanceNm"][data-leg="${leg.id}"]`);
+      if(distEl) distEl.value = leg.distanceNm;
+      if(msgEl){ msgEl.textContent = `найдено: ${fmt(route.distanceNm,1)} nm`; msgEl.className = 'lookup-msg ok'; }
+      renderLegBreakdown(leg);
+      recomputeAll();
+    } else if(msgEl){
+      msgEl.textContent = 'маршрут не найден в библиотеке — введите дистанцию вручную и сохраните';
+      msgEl.className = 'lookup-msg miss';
+    }
+    return;
+  }
+  if(action === 'save-route'){
+    if(!leg.fromPort.trim() || !leg.toPort.trim() || !(Number(leg.distanceNm) > 0)){
+      const msgEl = document.getElementById(`lookup-msg-${leg.id}`);
+      if(msgEl){ msgEl.textContent = 'заполните "От", "До" и дистанцию > 0, чтобы сохранить маршрут'; msgEl.className = 'lookup-msg miss'; }
+      return;
+    }
+    upsertRoute(leg.fromPort, leg.toPort, Number(leg.distanceNm));
+    const msgEl2 = document.getElementById(`lookup-msg-${leg.id}`);
+    if(msgEl2){ msgEl2.textContent = 'сохранено в библиотеку маршрутов'; msgEl2.className = 'lookup-msg ok'; }
+    return;
+  }
+});
+
+document.getElementById('add-leg-btn').addEventListener('click', () => {
+  state.legs.push(newLeg());
+  renderLegs();
+});
+
+// ---------- aggregation ----------
+function recomputeAll(){
+  let totalSeaDaysAll = 0, totalPortDaysAll = 0, totalCanalDaysAll = 0, totalMarginDaysAll = 0;
+  let vlsfoSum = 0, lsmgoSum = 0;
+  const legRows = [];
+
+  state.legs.forEach((leg) => {
+    const c = computeLeg(leg);
+    totalSeaDaysAll += c.seaDays;
+    totalMarginDaysAll += c.marginDays;
+    totalPortDaysAll += c.portStayDays + c.portWorkDays;
+    totalCanalDaysAll += c.canalDays;
+    vlsfoSum += c.vlsfoTotal;
+    lsmgoSum += c.lsmgoTotal;
+    legRows.push({
+      name: `${leg.fromPort || '?'} → ${leg.toPort || '?'} (${leg.condition})`,
+      seaDays: c.seaDays, portDays: c.portStayDays + c.portWorkDays, canalDays: c.canalDays,
+      vlsfo: c.vlsfoTotal, lsmgo: c.lsmgoTotal
+    });
+    renderLegBreakdown(leg);
+  });
+
+  document.getElementById('voyage-meta').textContent =
+    `Этапов: ${state.legs.length} · Сут. в пути (с margin): ${fmt(totalSeaDaysAll,2)} · из них margin: ${fmt(totalMarginDaysAll,2)} · Сут. в порту: ${fmt(totalPortDaysAll,2)} · Сут. в каналах: ${fmt(totalCanalDaysAll,2)}`;
+
+  const summaryEl = document.getElementById('summary-container');
+  if(state.legs.length === 0){
+    summaryEl.innerHTML = '<div class="empty-state">Добавьте хотя бы один этап рейса.</div>';
+  } else {
+    const rowsHtml = [
+      { name: 'VLSFO', total: vlsfoSum },
+      { name: 'LSMGO', total: lsmgoSum }
+    ].map(f => `<tr><td>${f.name}</td><td>${fmt(f.total)}</td></tr>`).join('');
+    summaryEl.innerHTML = `
+      <table class="summary-table">
+        <thead><tr><th style="text-align:left;">Топливо</th><th>Итого, т (sea margin уже учтён в сутках)</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+  }
+
+  const bEl = document.getElementById('breakdown-container');
+  if(legRows.length === 0){
+    bEl.innerHTML = '<div class="empty-state">Нет данных для разбивки.</div>';
+  } else {
+    const body = legRows.map(lr => `
+      <tr>
+        <td>${escapeHtml(lr.name)}</td>
+        <td>${fmt(lr.seaDays,2)}</td>
+        <td>${fmt(lr.portDays,2)}</td>
+        <td>${fmt(lr.canalDays,2)}</td>
+        <td>${fmt(lr.vlsfo)}</td>
+        <td>${fmt(lr.lsmgo)}</td>
+      </tr>`).join('');
+    bEl.innerHTML = `
+      <table class="breakdown-table">
+        <thead><tr><th style="text-align:left;">Этап</th><th>Сут. переход (с margin)</th><th>Сут. порт</th><th>Сут. канал</th><th>VLSFO, т</th><th>LSMGO, т</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>`;
+  }
+}
+
+// ---------- init ----------
+renderProfileInputs();
+renderRoutesPanel();
+renderLegs();
+
+(async function init(){
+  const p = await loadProfile();
+  if(p) state.profile = { ...state.profile, ...p };
+  state.routes = await loadRoutesFromStorage();
+  if(state.legs.length === 0){ state.legs.push(newLeg()); }
+  renderProfileInputs();
+  renderRoutesPanel();
+  renderLegs();
+})();
+</script>
+</body>
+</html>
